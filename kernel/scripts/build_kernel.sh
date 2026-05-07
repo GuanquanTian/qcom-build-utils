@@ -27,6 +27,8 @@ cp $treedir/.config $BUILD_TOP/out/
 make ARCH=arm64 -j32;
 # Deploy kernel Image to out/
 cp $kpath/Image $BUILD_TOP/out/
+# Deploy vmlinux (ELF with full symbol table, required for crash/perf/eBPF)
+cp $treedir/vmlinux $BUILD_TOP/out/
 
 # Make modules
 mkdir -p $BUILD_TOP/out/modules/
