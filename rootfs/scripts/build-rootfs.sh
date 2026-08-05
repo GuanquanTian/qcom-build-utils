@@ -654,6 +654,45 @@ echo '[CHROOT] Installing manifest packages (if any)...'
 /install_manifest_pkgs.sh || true
 
 # ==============================================================================
+# Grow rootfs on first boot: the flashed rootfs.img partition on target is
+# often larger than the 8G filesystem written here (see 'truncate -s 8G'
+# below), so extend the partition and filesystem the first time the device
+# boots. The target device/partition number aren't known at build time (this
+# chroot has no real block device — the ext4 image is created after we exit
+# chroot), so device discovery happens at runtime via the 'system' label
+# rather than by inspecting /etc/fstab (which has no '/' entry; root is
+# mounted via the 'root=LABEL=system' kernel cmdline, not fstab).
+# ==============================================================================
+echo '[CHROOT] Installing cloud-guest-utils for first-boot rootfs growth...'
+apt-get install -y --no-install-recommends cloud-guest-utils gdisk e2fsprogs
+
+echo '[CHROOT] Generating first-boot rootfs grow script and systemd unit...'
+cat <<'GROWFS_SCRIPT' > /usr/local/sbin/qcom-grow-rootfs.sh
+#!/bin/sh
+set -eu
+ROOTFS_DEV=\$(findfs LABEL=system)
+PART_NAME=\$(basename \$ROOTFS_DEV)
+PARENT_DISK=\$(lsblk -no PKNAME \$ROOTFS_DEV)
+PART_NUM=\$(cat /sys/class/block/\$PART_NAME/partition)
+growpart /dev/\$PARENT_DISK \$PART_NUM || true
+resize2fs \$ROOTFS_DEV
+systemctl disable qcom-grow-rootfs.service
+GROWFS_SCRIPT
+chmod +x /usr/local/sbin/qcom-grow-rootfs.sh
+
+cat <<'GROWFS_UNIT' > /etc/systemd/system/qcom-grow-rootfs.service
+[Unit]
+Description=Grow root partition and filesystem (first boot)
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/qcom-grow-rootfs.sh
+[Install]
+WantedBy=default.target
+GROWFS_UNIT
+
+systemctl enable qcom-grow-rootfs.service
+
+# ==============================================================================
 # Run update-grub after ALL installs (firmware, kernel via dpkg or apt, manifest,
 # local-debs). This ensures GRUB sees whichever kernel was installed last,
 # regardless of the delivery path.
