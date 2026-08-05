@@ -692,6 +692,11 @@ GROWFS_UNIT
 
 systemctl enable qcom-grow-rootfs.service
 
+echo '[CHROOT] Installing udev rule to autostart remoteproc0/1 on attach...'
+cat <<'REMOTEPROC_RULES' > /etc/udev/rules.d/99-remoteproc-autostart.rules
+ACTION==\"add\", SUBSYSTEM==\"remoteproc\", KERNEL==\"remoteproc[01]\", ATTR{state}=\"start\"
+REMOTEPROC_RULES
+
 # ==============================================================================
 # Run update-grub after ALL installs (firmware, kernel via dpkg or apt, manifest,
 # local-debs). This ensures GRUB sees whichever kernel was installed last,
