@@ -653,6 +653,17 @@ fi
 echo '[CHROOT] Installing manifest packages (if any)...'
 /install_manifest_pkgs.sh || true
 
+echo '[CHROOT] Installing udev rule to autostart remoteproc (adsp/cdsp) on attach...'
+cat <<'REMOTEPROC_RULES' > /etc/udev/rules.d/99-remoteproc-autostart.rules
+# Autostart specific remote processors by their stable sysfs 'name' attribute.
+# Matching on the remoteprocN index is unreliable: the number is assigned in
+# probe order and is not guaranteed to map to the same processor across boards
+# or kernel versions. The 'name' attribute (adsp/cdsp/...) comes from the driver
+# and is stable, so it targets the intended processors regardless of numbering.
+ACTION==\"add\", SUBSYSTEM==\"remoteproc\", ATTR{name}==\"adsp\", ATTR{state}=\"start\"
+ACTION==\"add\", SUBSYSTEM==\"remoteproc\", ATTR{name}==\"cdsp\", ATTR{state}=\"start\"
+REMOTEPROC_RULES
+
 # ==============================================================================
 # Run update-grub after ALL installs (firmware, kernel via dpkg or apt, manifest,
 # local-debs). This ensures GRUB sees whichever kernel was installed last,
